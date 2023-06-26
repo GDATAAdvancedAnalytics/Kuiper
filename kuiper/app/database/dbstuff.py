@@ -22,31 +22,6 @@ DB_PORT = app.config['DB_PORT']
 
 
 
-
-
-# =================================================
-#               Database System Health
-# =================================================
-class DB_Health:
-    mongo_db = None
-
-    def __init__(self):
-        self.health = {}
-        if MClient is None:
-            self.health['connected'] = False
-        else:
-            self.health['connected'] = True
-            self.health['alive'] = MClient.alive()
-            self.health['databases_exists'] = True if DB_NAME in MClient.database_names() else False
-            
-    
-
-def get_db_health():
-    return DB_Health()
-
-
-
-
 # =================================================
 #               Database Groups
 # =================================================
@@ -60,7 +35,7 @@ class DB_Groups():
         # if rules collection not exists, add it to mongoDB
         db_m = MClient[DB_NAME]
         
-        if 'groups' not in db_m.collection_names():
+        if 'groups' not in db_m.list_collection_names():
             db_m.create_collection('groups')
 
         self.MongoClient = MClient[DB_NAME]["groups"]
@@ -89,7 +64,7 @@ class DB_Groups():
     def add_group(self, case_name , group_name):
         try:
             
-            self.MongoClient.insert({
+            self.MongoClient.insert_one({
                 '_id'       : case_name + "_" + group_name,
                 "case_name" : case_name,
                 'group_name': group_name
@@ -110,7 +85,7 @@ class DB_Groups():
             if res[0] == False:
                 return res 
 
-            data = self.MongoClient.remove({"_id":case_id + "_" + group_name})
+            data = self.MongoClient.delete_one({"_id":case_id + "_" + group_name})
             return [True, "Group ["+group_name+"] deleted"]
 
         except Exception as e:
@@ -143,7 +118,7 @@ class DB_Cases:
 
         # if cases collection not exists, add it to mongoDB
         db_m = MClient[DB_NAME]
-        if 'cases' not in db_m.collection_names():
+        if 'cases' not in db_m.list_collection_names():
             db_m.create_collection('cases')
 
         self.mongo_db = MClient[DB_NAME]["cases"]
@@ -187,7 +162,7 @@ class DB_Cases:
             machine_details['_id'] = machine_details['main_case'] + "_" + machine_details['machinename']
             machine_details['creation_time']= str( datetime.now() ).replace(' ' , 'T')
             # insert into collection
-            collection.insert(machine_details)
+            collection.insert_one(machine_details)
             return [True, machine_details['_id'] ]
 
         except DuplicateKeyError:
@@ -200,7 +175,7 @@ class DB_Cases:
     def delete_machine(self, machine_id):
         try:
             collection = self.mongo_db['machines']
-            data = collection.remove({"_id":machine_id})
+            data = collection.delete_one({"_id": machine_id})
 
             collection = MClient[DB_NAME]['files']
             data = collection.remove({"_id":machine_id})
@@ -215,7 +190,7 @@ class DB_Cases:
     def update_machine(self , machine_id , machine_details):
         try:
             collection = self.mongo_db["machines"]
-            up = collection.update({'_id':machine_id}, {'$set': machine_details },upsert=False)
+            up = collection.update_one({'_id':machine_id}, {'$set': machine_details },upsert=False)
             return [True, up]
         except Exception as e:
             return [False, "Error: " + str(e)]
@@ -238,7 +213,7 @@ class DB_Cases:
                 if 'groups' in machine[1] and group_name in machine[1]['groups']:
                     continue
 
-                up = collection.update({ "_id" : m }, {'$push': {'groups' : group_name} },upsert=False)
+                up = collection.update_one({ "_id" : m }, {'$push': {'groups' : group_name} },upsert=False)
             return [True, up]
         except Exception as e:
             return [False, "Error: " + str(e)]
@@ -253,7 +228,7 @@ class DB_Cases:
         try:
             collection  = self.mongo_db["machines"]
             for m in machines_list:
-                up = collection.update({ "_id" : m }, {'$pull': {'groups' : group_name} },upsert=False)
+                up = collection.update_one({ "_id" : m }, {'$pull': {'groups' : group_name} },upsert=False)
             return [True, up]
         except Exception as e:
             return [False, "Error: " + str(e)]
@@ -269,7 +244,7 @@ class DB_Cases:
             collection  = self.mongo_db["machines"]
             machines = collection.find({ "main_case" : case_id })
             for m in machines:
-                up = collection.update({ "_id" : m['_id'] }, {'$pull': {'groups' : group_name} },upsert=False)
+                up = collection.update_one({ "_id" : m['_id'] }, {'$pull': {'groups' : group_name} },upsert=False)
             return [True, up]
         except Exception as e:
             return [False, "Error: " + str(e)]
@@ -306,8 +281,8 @@ class DB_Cases:
     # delete case by its id
     def delete_case(self, case_id):
         try:
-            data = self.mongo_db.remove({"casename":case_id})
-            data = self.mongo_db['machines'].remove({"main_case":case_id})
+            data = self.mongo_db.delete_one({"casename":case_id})
+            data = self.mongo_db['machines'].delete_many({"main_case":case_id})
             return [True, "Case ["+case_id+"] deleted"]
         except Exception as e:
             return [False, str(e)]
@@ -316,7 +291,7 @@ class DB_Cases:
     # update case details information
     def update_case(self, case_id , case_details):
         try:
-            up = self.mongo_db.update({'casename':case_id}, {'$set': case_details },upsert=False)
+            up = self.mongo_db.update_one({'casename':case_id}, {'$set': case_details },upsert=False)
             return [True, up]
         except Exception as e:
             return [False, "Error: " + str(e)]
@@ -339,7 +314,7 @@ class DB_Cases:
 
 
             # insert into collection
-            self.mongo_db.insert(data)
+            self.mongo_db.insert_one(data)
             return [True, data]
 
         except DuplicateKeyError:
@@ -376,7 +351,7 @@ class DB_Rules():
         # if rules collection not exists, add it to mongoDB
         db_m = MClient[DB_NAME]
         
-        if 'rules' not in db_m.collection_names():
+        if 'rules' not in db_m.list_collection_names():
             db_m.create_collection('rules')
 
         self.MongoClient = MClient[DB_NAME]["rules"]
@@ -399,7 +374,7 @@ class DB_Rules():
     # delete rule
     def delete_rule(self, rule_id):
         try:
-            self.MongoClient.remove({"_id":rule_id})
+            self.MongoClient.delete_one({"_id":rule_id})
             return [True , "Rule ["+rule_id+"] deleted from mongoDB"]
         except Exception as e:
             return [False , e]
@@ -408,8 +383,8 @@ class DB_Rules():
     # update rule
     def update_rule(self, rule_id , new_rule , new_sev , new_desc):
         try:
-            up = self.MongoClient.update({'_id':rule_id}, {'$set': {'rule' : new_rule , 'rule_severity' : new_sev , 'rule_description' : new_desc} },upsert=False)
-            if up['updatedExisting']:
+            up = self.MongoClient.update_one({'_id':rule_id}, {'$set': {'rule' : new_rule , 'rule_severity' : new_sev , 'rule_description' : new_desc} },upsert=False)
+            if up.modified_count > 0:
                 return [True , "Rule ["+rule_id+"] updated from mongoDB"]
             else:
                 return [False , "Rule ["+rule_id+"] failed updated from mongoDB"]
@@ -424,7 +399,7 @@ class DB_Rules():
             # insert the rule to mongoDB
             rule_id = hashlib.md5(rule_name).hexdigest() # get md5 hash of rule and use it as rule id to avoid duplication
 
-            self.MongoClient.insert({
+            self.MongoClient.insert_one({
                 '_id' : rule_id,
                 "rule" : rule,
                 'rule_name' : rule_name,
@@ -469,7 +444,7 @@ class DB_Parsers:
         # if parsers collection not exists, add it to mongoDB
         db_m = MClient[DB_NAME]
         
-        if 'parsers' not in db_m.collection_names():
+        if 'parsers' not in db_m.list_collection_names():
             db_m.create_collection('parsers')
 
         self.collection = MClient[DB_NAME]["parsers"]
@@ -519,7 +494,7 @@ class DB_Parsers:
             parser_details['_id'] = parser_details['name']
             parser_details['creation_time']= str( datetime.now() ).replace(' ' , 'T')
             # insert into collection
-            self.collection.insert(parser_details)
+            self.collection.insert_one(parser_details)
 
             
                     
@@ -544,10 +519,10 @@ class DB_Parsers:
     def edit_parser(self, parser_name ,  parser_details):
         try:
             # update into collection
-            up = self.collection.update({'_id':parser_name}, {'$set': parser_details},upsert=False)
+            up = self.collection.update_one({'_id':parser_name}, {'$set': parser_details},upsert=False)
 
             
-            if up['updatedExisting']:
+            if up.modified_count > 0:
 
                     
                 # write the parser configuration to file
@@ -606,7 +581,7 @@ class DB_Parsers:
             if parser_details is None:
                 return [False , "Parser not found in database"]
 
-            data = self.collection.remove({"_id": parser_name})
+            data = self.collection.delete_one({"_id": parser_name})
 
             logger.logger(level=logger.INFO , type="mongo_parsers", message="Parser ["+parser_name+"] removed from database")
             
@@ -669,7 +644,7 @@ class DB_Files:
 
         # if files collection not exists, add it to mongoDB
         db_m = MClient[DB_NAME]
-        if 'files' not in db_m.collection_names():
+        if 'files' not in db_m.list_collection_names():
             db_m.create_collection('files')
 
         self.collection = MClient[DB_NAME]["files"]
@@ -882,8 +857,9 @@ def get_db_files():
 
 
 try:
-    MClient = MongoClient(DB_IP + ":" + str(DB_PORT) )
+    MClient = MongoClient("mongodb://" + DB_IP + ":" + str(DB_PORT) )
 except Exception as e:
+    # NOTE: pymongo v3 does not throw a connection exception here anymore
     MClient = None
     logger.logger(level=logger.ERROR , type="database", message="Failed to access to MongoDB " + str(DB_IP) + ":" + str(DB_PORT) , reason=str(e))
     
@@ -892,5 +868,4 @@ db_cases    = get_db_cases()    # get case database
 db_rules    = get_db_rules()    # get rule database
 db_files    = get_db_files()    # get files databse
 db_parsers  = get_db_parsers()  # get parser database
-db_health   = get_db_health()
 db_groups   = get_db_groups()

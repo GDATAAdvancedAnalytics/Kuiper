@@ -8,17 +8,18 @@ from pymongo import MongoClient
 
 def get_mongodb_info(DB_NAME, DB_IP , DB_PORT):
     
-    MClient = MongoClient(DB_IP + ":" + str(DB_PORT) )
+    MClient = MongoClient("mongodb://" + DB_IP + ":" + str(DB_PORT) )
 
     
     health = {}
-    if MClient is None:
-        health['connected'] = False
-    else:
+    try:
+        health['alive'] = MClient.admin.command('ping').get('ok') == 1.0
         health['connected'] = True
-        health['alive'] = MClient.alive()
-        health['databases_exists'] = True if DB_NAME in MClient.database_names() else False
-        
+        health['databases_exists'] = True if DB_NAME in MClient.list_database_names() else False
+    except:
+        health['alive'] = False
+        health['connected'] = False
+
     mongodb_details = {
         'mongodb_db_IP'     :  DB_IP,
         'mongodb_db_name'   :  DB_NAME,
