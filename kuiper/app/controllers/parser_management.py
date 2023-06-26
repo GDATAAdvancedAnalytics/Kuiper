@@ -605,7 +605,7 @@ class Parser_Manager:
 
         # check if the parser_name in the parser list of the file in DB 
         for p in db_file[1]['parsers']:
-            if parser_name == p['parser_name'] and 'disable' in p.keys() and p['disable'] == 'True':
+            if parser_name == p['parser_name'] and 'disable' in p.keys() and p['disable'] == True:
                 return [True,  True] # True means it is disabled
 
         return [True , False]# False means it is enabled

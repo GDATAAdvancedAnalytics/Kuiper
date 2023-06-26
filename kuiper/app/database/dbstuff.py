@@ -178,7 +178,7 @@ class DB_Cases:
             data = collection.delete_one({"_id": machine_id})
 
             collection = MClient[DB_NAME]['files']
-            data = collection.remove({"_id":machine_id})
+            data = collection.delete_many({"machine_id": machine_id})
 
             return [True, data]
         except Exception as e:
@@ -648,56 +648,41 @@ class DB_Files:
             db_m.create_collection('files')
 
         self.collection = MClient[DB_NAME]["files"]
+        self.collection.ensure_index("machine_id")
+        # Compound index with high-cardinality field first (file_path)
+        self.collection.ensure_index([("file_path", 1), ("machine_id", 1)])
+        # Avoid COLSCAN in get_by_status()
+        self.collection.ensure_index("parsers.status")
 
     # ===================================== Get machine files
     # get all files for specified machine
     def get_by_machine(self, machine_id):
         try:
-            machine_files = self.add_machine_in_files(machine_id) # if machine not in DB add it
-            for p in self.collection.find({'_id' : machine_id}):
-                return [True, p]
-            return [True, None ]
-        except Exception as e:
-            return [False, str(e)]
-
-    # ===================================== add machine in files
-    # inside the files collection, if the machine not defined add it
-    def add_machine_in_files(self, machine_id):
-        try:
-            # === check if the machine exists in files DB, if not exists create it
-            machine_files = None # store the files for specifc machine in DB
-            for m in self.collection.find({'_id': machine_id}):
-                machine_files = m 
-            # if machine not exists, add it
-            if machine_files is None:
-                self.collection.insert({"_id" : machine_id , "files" : []})
-                for m in self.collection.find({'_id': machine_id}):
-                    machine_files = m
-                
-            return [True, machine_files]
+            files = []
+            for file in self.collection.find({'machine_id': machine_id}):
+                files.append(file)
+            return [True, files]
         except Exception as e:
             return [False, str(e)]
 
     # ===================================== Disable/Enable file processing
     # this function will disable a file from being parsed by specific parser
-    def disable_enable_file(self, machine_id , file_path, parser , disable):
+    def disable_enable_file(self, machine_id, file_path, parser, disable):
         try:
-            machine = self.get_by_machine(machine_id)
-            # if file not exists
-            if machine[0] == False:
-                return [False , machine[1]]
-            
-            files = machine[1]['files']
-            # add field disable as True on the files json
-            for f in range(len(files)):
-                if files[f]['file_path'] == file_path:
-                    for p in range(len(files[f]['parsers'])):
-                        if files[f]['parsers'][p]['parser_name'] == parser:
-                            files[f]['parsers'][p]['disable'] = str(disable)
-            
-            up = self.collection.update({'_id':machine_id}, {'$set': {'files' : files}})
-            
-            if up:
+            up = self.collection.update_one(
+                {
+                    "machine_id": machine_id,
+                    "file_path": file_path,
+                    "parsers.parser_name": parser
+                },
+                {
+                    "$set": {
+                        "parsers.$.disable": disable
+                    }
+                }
+            )
+
+            if up.modified_count > 0:
                 s = "disabled" if disable else "enabled"
                 return [True , "File ["+file_path+"] "+s+" on parser ["+parser+"]" ]
             else:
@@ -707,110 +692,104 @@ class DB_Files:
             return [False , "Failed to update the record: " + str(e)]
 
     # ===================================== Add file
-    # add files to the database
-    def add_file(self, machine_id , file_details):
+    # add file to the database or merge details with existing file document
+    def add_file(self, machine_id, file_details):
         try:
-            machine_files = self.add_machine_in_files(machine_id)
-            if machine_files[0] == False:
-                return machine_files
+            # If the file does not exist yet, add it
+            res = self.collection.update_one(
+                {
+                    "machine_id": machine_id,
+                    "file_path": file_details["file_path"]
+                },
+                {
+                    "$setOnInsert": {
+                        "machine_id": machine_id,
+                        "file_path": file_details["file_path"],
+                        "file_size": file_details["file_size"],
+                        "parsers": [file_details["parsers"]]
+                    }
+                },
+                upsert=True
+            )
 
-            machine_files = machine_files[1]
+            if res.upserted_id is not None:
+                return [True, "File added to database"]
 
-            # === merge the file_details with the files from the database
-            # check if the file in DB, if yes get its information
-            file_in_db = False
+            # If file exists in DB, add the new parser if it does not exist
+            res = self.collection.update_one(
+                {
+                    "machine_id": machine_id,
+                    "file_path": file_details["file_path"],
+                    "parsers.parser_name": { "$ne": file_details["parsers"]["parser_name"] }
+                },
+                {
+                    "$push": { "parsers": file_details["parsers"] }
+                }
+            )
 
-            for i in range(0 , len(machine_files['files']) ):
-                
-                if machine_files['files'][i]['file_path'] == file_details['file_path']:
-                    file_in_db = True # if file in database
-                    parser_in_file = False
-                    # check if parser already exists, edit the parser details
-                    for p in range( 0 , len(machine_files['files'][i]['parsers'])):
-                        if machine_files['files'][i]['parsers'][p]['parser_name'] == file_details['parsers']['parser_name']:
-                            machine_files['files'][i]['parsers'][p] = file_details['parsers']
-                            parser_in_file = True
-                            break
+            if res.modified_count > 0:
+                return [True, "Parser added to file in database"]
 
-                    # if parser not exists for the file, add the parser
-                    if parser_in_file == False:
-                        machine_files['files'][i]['parsers'].append( file_details['parsers'] )
-                    
-                    break
-            if file_in_db == False:
-                # if file not in DB, the parser should be in list, since there is no parsers before
-                file_details['parsers'] = [file_details['parsers']]
-                machine_files['files'].append(file_details)
-            
-            # delete record id
-            del machine_files['_id']
-            
-            # === edit the database with the new list of files
-            up = self.collection.update({'_id':machine_id}, {'$set': machine_files},upsert=False)
-            if up:
-                return [True , "File added to database"]
+            # File and parser exist, update the parser details
+            res = self.collection.update_one(
+                {
+                    "machine_id": machine_id,
+                    "file_path": file_details["file_path"],
+                    "parsers.parser_name": file_details["parsers"]["parser_name"]
+                },
+                {
+                    "$set": { "parsers.$": file_details["parsers"] }
+                }
+            )
+
+            if res.modified_count > 0:
+                return [True, "Parser details updated in database"]
             else:
-                return [False , "Failed to update the record"]
+                return [False, "Failed to update the record"]
 
-        except DuplicateKeyError:
-            return [False , "Machine already present in DB." ]
         except Exception as e:
             return [False , "Error: " + str(e)]
 
-    
     # ===================================== Get file details
     # get parsers details for all parsers by the file path
     def get_by_file_path(self, machine_id , file_path):
         try:
-            machine_files = self.add_machine_in_files(machine_id) # if machine not in DB add it
-            if machine_files[0] == False:
-                return machine_files
+            for f in self.collection.find({'machine_id': machine_id, 'file_path': file_path}):
+                return [True, f]
 
-
-            for p in self.collection.find({'_id' : machine_id}):
-                for f in p['files']:
-                    if f['file_path'] == file_path:
-                        return [True , f]
-
-            return [True , None]
+            return [True, None]
         except Exception as e:
             return [False, str(e)]
+
     # ===================================== Get parsing progress
     # get the status of parsers for specific machine
     def get_parsing_progress(self, machine_id):
         try:
-            machine_files = self.add_machine_in_files(machine_id) # if machine not in DB add it
-            if machine_files[0] == False:
-                return machine_files
-
             parsers_progress = {}
-            for db_f in self.collection.find({'_id' : machine_id}):
-                for f in db_f['files']:
-                    for p in f['parsers']:
-                        if p['parser_name'] not in parsers_progress.keys():
-                            parsers_progress[ p['parser_name'] ] = []
-                        parsers_progress[ p['parser_name'] ].append( {'file' : f['file_path'] , 'status' : p['status']} )
-                        
+            for f in self.collection.find({'machine_id': machine_id}):
+                for p in f['parsers']:
+                    if p['parser_name'] not in parsers_progress.keys():
+                        parsers_progress[ p['parser_name'] ] = []
+                    parsers_progress[ p['parser_name'] ].append( {'file' : f['file_path'] , 'status' : p['status']} )
+
             return [True, parsers_progress]
         except Exception as e:
             return [False,  str(e)]
 
     # ==================================== Get files based on status
-    # get the files based on thier status 
+    # get files globally based on their status 
     def get_by_status(self, status):
         try:
             files = []
-            for machine in self.collection.aggregate([
-                        {"$unwind": "$files"},
-                        {"$unwind": "$files.parsers"},
-                        {"$match": {"files.parsers.status": status}}
-                    ], cursor={}):
-                f = machine["files"]
-                files.append({
-                    'machine_id': machine['_id'],
-                    'file_path': f['file_path'],
-                    'file_size': f['file_size'],
-                    'parser': f['parsers']
+            for f in self.collection.find({"parsers.status": status},
+                                          {"machine_id": 1, "file_path": 1, "file_size": 1,
+                                           "parsers": { "$elemMatch": { "status": status } }}):
+                for parser in f['parsers']:
+                    files.append({
+                        'machine_id': f['machine_id'],
+                        'file_path': f['file_path'],
+                        'file_size': f['file_size'],
+                        'parser': parser
                     })
 
             return [True, files]
@@ -818,31 +797,29 @@ class DB_Files:
             return [False,  str(e)]
 
     # ==================================== update file based on task id
-    # update files content based on the provided task id 
-    def update_files_by_task_id(self , machine_id , task_id , status , message):
+    # update file status/message based on the provided task id
+    def update_files_by_task_id(self, machine_id, task_id, status, message):
         try:
-            machine_files = self.add_machine_in_files(machine_id) # if machine not in DB add it
-            if machine_files[0] == False:
-                return machine_files
+            self.collection.update_many(
+                {
+                    "machine_id": machine_id,
+                    "parsers": {
+                        "$elemMatch": {
+                            "task_id": task_id,
+                            "status": {"$in": ["queued", "parsing"]}
+                        }
+                    }
+                },
+                {
+                    "$set": {
+                        "parsers.$[elem].status": status,
+                        "parsers.$[elem].message": message
+                    }
+                },
+                array_filters=[{"elem.task_id": task_id, "elem.status": {"$in": ["queued", "parsing"]}}]
+            )
 
-            files = {}
-            for machine in self.collection.find({'_id' : machine_id}):
-                changed = False
-                for f in machine['files']:
-                    for p in f['parsers']:
-                    
-                        if 'task_id' in p.keys() and p['task_id'] == task_id and p['status'] in ['queued' , 'parsing']:
-                            p['status']  = status
-                            p['message'] = message
-                            changed      = True
-                if changed:
-                    up = self.collection.update({'_id':machine_id}, {'$set': machine},upsert=False)
-                    if up:
-                        return [True , "Updated"]
-                    else:
-                        return [False , "Failed to update"]
-
-            return [True, 'Updated']
+            return [True, "Updated"]
         except Exception as e:
             return [False,  str(e)]
 

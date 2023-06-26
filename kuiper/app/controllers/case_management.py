@@ -579,7 +579,8 @@ def case_machine_files_status(case_id , machine_id):
             logger.logger(level=logger.ERROR , type="case", message="Case["+case_id+"]: Failed getting machine files", reason=files[1])
             return render_template('case/error_page.html',case_details=case_id ,SIDEBAR=SIDEBAR , CASE_FIELDS=CASE_FIELDS[1] , message="Failed getting machine files<br />" + files[1])
         
-        return render_template('case/machine_file_status.html',case_details=case[1] ,SIDEBAR=SIDEBAR, machine_id=machine_id , db_files=files[1]['files'] )
+        files_encodable = [{key: value for key, value in file.items() if key != '_id'} for file in files[1]]
+        return render_template('case/machine_file_status.html',case_details=case[1] ,SIDEBAR=SIDEBAR, machine_id=machine_id , db_files=files_encodable )
 
 
 

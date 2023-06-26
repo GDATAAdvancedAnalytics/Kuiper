@@ -99,9 +99,7 @@ function get_datatable_list(files){
 			var file_path = files[f]['file_path'].split("{{machine_id}}")[1]
 			badge = (badge_class.hasOwnProperty(files[f]['parsers'][p]['status']) ) ? badge_class[ files[f]['parsers'][p]['status'] ] : 'bg-gray'
 			var status = '<span class="badge badge-pill '+badge+'" style="padding:5px">'+files[f]['parsers'][p]['status']+'</span>'
-			var chkbox = '<input class="files_checkbox" data-path="'+files[f]['file_path']+'" data-parser="'+files[f]['parsers'][p]['parser_name']+'" type="checkbox">'
-			var disabled_flag = ' <i class="fa fa-fw fa-chain'+( files[f]['parsers'][p].hasOwnProperty('disable') && files[f]['parsers'][p]['disable'] == 'True' ? '-broken' : '' )+'"></i> '
-			var disabled = ( files[f]['parsers'][p].hasOwnProperty('disable') && files[f]['parsers'][p]['disable'] == 'True' ? true : false )
+			var disabled = ( files[f]['parsers'][p].hasOwnProperty('disable') && files[f]['parsers'][p]['disable'] == true )
 			var disable_enable_btn = '<button type="button" class="btn_disable_enable_files btn btn-'+(disabled?'warning' : 'success') +' btn-xs" data-action="'+(disabled?'enable' : 'disable') +'" title="File parsing is '+(disabled?'disabled' : 'enabled') +'" data-path="'+files[f]['file_path']+'" data-parser="'+files[f]['parsers'][p]['parser_name']+'"><i class="fa fa-fw fa-chain'+(disabled?'-broken' : '') +'"></i></button>'
 
 
