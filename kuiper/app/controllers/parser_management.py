@@ -728,6 +728,7 @@ class Parser_Manager:
     # this function check the files size in parsing status and the avaliable memory space
     # then check if the following file can be parsed on the memory or not
     def wait_memory_free(self, needed_size):
+        """
         files = db_files.get_by_status('parsing')
         if not files[0]:
             return [False, files[1]]
@@ -736,10 +737,12 @@ class Parser_Manager:
         parsing_files_size = 0
         for f in files[1]:
             parsing_files_size += f['file_size']
+        """
 
         available_memory    = dict(psutil.virtual_memory()._asdict())['available']
         
-        if (available_memory - (parsing_files_size*1.5)) > needed_size*1.5:
+        # if (available_memory - (parsing_files_size*1.5)) > needed_size*1.5:
+        if available_memory > needed_size:
             return False
         else:
             return True
