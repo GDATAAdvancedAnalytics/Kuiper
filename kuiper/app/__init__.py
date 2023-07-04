@@ -23,6 +23,8 @@ app = Flask(__name__)
 y = yaml.load( open( 'configuration.yaml' , 'r' ) , Loader=yaml.FullLoader )
 
 
+app.config['PROPAGATE_EXCEPTIONS']      = True
+
 app.config['APP_FOLDER']				= os.path.abspath( ''.join(y['Directories']['app_folder']) )			# app folder
 app.config['UPLOADED_FILES_DEST'] 		= os.path.abspath( ''.join(y['Directories']['artifacts_upload']) )		# uploaded artifacts files
 app.config['UPLOADED_FILES_DEST_RAW'] 	= os.path.abspath( ''.join(y['Directories']['artifacts_upload_raw']) )	# uploaded artifacts raw files
