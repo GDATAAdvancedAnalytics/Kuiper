@@ -13,6 +13,7 @@ from app import logger
 from elasticsearch import Elasticsearch
 import elasticsearch
 from elasticsearch import helpers
+from elasticsearch.connection import create_ssl_context
 
 from datetime import datetime 
 
@@ -76,17 +77,21 @@ def json_get_val_by_path(j , p):
 def get_es():
     ip = os.getenv('ES_IP', y['ElasticSearch']["IP"])
     port = os.getenv('ES_PORT', y['ElasticSearch']['PORT'])
-    return ES_DB( ip,str( port ) )
+    url = os.getenv('ES_URL')  # alternative to ES_IP and ES_PORT
+    api_key = os.getenv('ES_API_KEY')
+    ca_file = os.getenv('ES_CA_FILE')
+    return ES_DB(url if url else ('http://' + ip + ':' + port), api_key=api_key, ca_file=ca_file)
 
 class ES_DB:
 
     es_db     = None
 
     # ================================ initializer
-    def __init__(self, es_ip , es_port):
-        self.es_ip = es_ip
-        self.es_port = es_port
-        self.es_db = Elasticsearch('http://'+self.es_ip+':' + self.es_port , timeout=120)
+    def __init__(self, es_url, api_key=None, ca_file=None):
+        transport_args = {}
+        if ca_file is not None:
+            transport_args = {'ssl_context': create_ssl_context(cafile=ca_file)}
+        self.es_db = Elasticsearch(es_url, api_key=api_key, timeout=120, **transport_args)
         #print inspect.getargspec(self.es_db.indices.put_settings())
         # setting 
 
