@@ -384,7 +384,7 @@ class DB_Rules():
     def update_rule(self, rule_id , new_rule , new_sev , new_desc):
         try:
             up = self.MongoClient.update_one({'_id':rule_id}, {'$set': {'rule' : new_rule , 'rule_severity' : new_sev , 'rule_description' : new_desc} },upsert=False)
-            if up.modified_count > 0:
+            if up.matched_count > 0:
                 return [True , "Rule ["+rule_id+"] updated from mongoDB"]
             else:
                 return [False , "Rule ["+rule_id+"] failed updated from mongoDB"]
@@ -522,7 +522,7 @@ class DB_Parsers:
             up = self.collection.update_one({'_id':parser_name}, {'$set': parser_details},upsert=False)
 
             
-            if up.modified_count > 0:
+            if up.matched_count > 0:
 
                     
                 # write the parser configuration to file
@@ -682,7 +682,7 @@ class DB_Files:
                 }
             )
 
-            if up.modified_count > 0:
+            if up.matched_count > 0:
                 s = "disabled" if disable else "enabled"
                 return [True , "File ["+file_path+"] "+s+" on parser ["+parser+"]" ]
             else:
