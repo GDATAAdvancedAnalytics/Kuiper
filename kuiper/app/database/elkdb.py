@@ -80,7 +80,7 @@ def get_es():
     url = os.getenv('ES_URL')  # alternative to ES_IP and ES_PORT
     api_key = os.getenv('ES_API_KEY')
     ca_file = os.getenv('ES_CA_FILE')
-    return ES_DB(url if url else ('http://' + ip + ':' + port), api_key=api_key, ca_file=ca_file)
+    return ES_DB(url if url else ('http://' + ip + ':' + str(port)), api_key=api_key, ca_file=ca_file)
 
 class ES_DB:
 
