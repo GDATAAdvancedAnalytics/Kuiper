@@ -77,7 +77,7 @@ def json_get_val_by_path(j , p):
 def get_es():
     ip = os.getenv('ES_IP', y['ElasticSearch']["IP"])
     port = os.getenv('ES_PORT', y['ElasticSearch']['PORT'])
-    url = os.getenv('ES_URL')  # alternative to ES_IP and ES_PORT
+    url = os.getenv('ES_URL')  # alternative to ES_IP and ES_PORT; may be a comma-separated string
     api_key = os.getenv('ES_API_KEY')
     ca_file = os.getenv('ES_CA_FILE')
     return ES_DB(url if url else ('http://' + ip + ':' + str(port)), api_key=api_key, ca_file=ca_file)
@@ -91,7 +91,7 @@ class ES_DB:
         transport_args = {}
         if ca_file is not None:
             transport_args = {'ssl_context': create_ssl_context(cafile=ca_file)}
-        self.es_db = Elasticsearch(es_url, api_key=api_key, timeout=120, **transport_args)
+        self.es_db = Elasticsearch(es_url.split(','), api_key=api_key, timeout=120, **transport_args)
         #print inspect.getargspec(self.es_db.indices.put_settings())
         # setting 
 
