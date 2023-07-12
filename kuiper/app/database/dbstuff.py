@@ -28,7 +28,7 @@ DB_PORT = app.config['DB_PORT']
 
 # ===================================== DB groups
 # this class contain the groups
-class DB_Groups(client):
+class DB_Groups():
     MongoClient = None
     def __init__(self, client):
 
