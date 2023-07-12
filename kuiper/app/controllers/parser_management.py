@@ -36,9 +36,7 @@ import subprocess
 # return json in a beautifier
 def json_beautifier(js):
     return json.dumps(js, indent=4, sort_keys=True)
-uuid.uuid4()
 
-json_beautifier
 # =================================================
 #               Parser Management Class
 # =================================================
@@ -54,8 +52,10 @@ class Parser_Manager:
     # this initializer used by the task processor
     # if update_state not provided:
     # this initializer used when handling worker errors, which will be used for updating the files status
-    def __init__(self, main_case_id , machine_case_id , parsers_list , task_id , update_state=None):
+    def __init__(self, mongo_client, main_case_id, machine_case_id, parsers_list, task_id, update_state=None):
         
+        self.db_files       = get_db_files(mongo_client)
+        self.db_parsers     = get_db_parsers(mongo_client)
         self.case_id        = main_case_id
         self.machine_id     = machine_case_id
         self.parsers_list   = parsers_list
@@ -80,7 +80,7 @@ class Parser_Manager:
             for parser_name in self.parsers_list:
 
                 # === get parser details
-                db_parser_details = db_parsers.get_parser_by_name(parser_name)
+                db_parser_details = self.db_parsers.get_parser_by_name(parser_name)
                 if db_parser_details[0] == False:
                     logger.logger(level=logger.ERROR , type="parser", message="Failed getting parser information ["+parser_name+"]" , reason=db_parser_details[1])
                     continue
@@ -571,7 +571,7 @@ class Parser_Manager:
     # ================================ check if the file already parsed
     # check if the provided file already has been parsed by the provided parser
     def is_file_parsed(self , file , parser_name):
-        db_file = db_files.get_by_file_path(self.machine_id , file ) # get file details
+        db_file = self.db_files.get_by_file_path(self.machine_id , file ) # get file details
         # if file not in DB then not parsed 
         if db_file[0] == False:
             logger.logger(level=logger.ERROR , type="parser", message="Parser["+parser_name+"]: File ["+file+"] Failed checking if parsed or not" , reason=db_file[1])
@@ -593,7 +593,7 @@ class Parser_Manager:
     # ================================ check if the parsing for the file is disabled
     # check if the file parsing is disabled on this file or not
     def is_file_parsing_disabled(self , file , parser_name):
-        db_file = db_files.get_by_file_path(self.machine_id , file ) # get file details
+        db_file = self.db_files.get_by_file_path(self.machine_id , file ) # get file details
         # if file not in DB then not parsed 
         if db_file[0] == False:
             logger.logger(level=logger.ERROR , type="parser", message="Parser["+parser_name+"]: File ["+file+"] Failed checking if disabled or not" , reason=db_file[1])
@@ -627,7 +627,7 @@ class Parser_Manager:
                 },
             "file_size" : os.path.getsize( file )
             }
-        add_file = db_files.add_file(self.machine_id , file_details)
+        add_file = self.db_files.add_file(self.machine_id , file_details)
         if add_file[0]:
             return [ True, "Changed ["+file+"] for parser ["+parser_name+"] to: " + status]
         else:
@@ -637,7 +637,7 @@ class Parser_Manager:
     # =============================== update the files status
     # update the files status for files that are processed via the specified task_id
     def update_db_files_status(self, status, message):
-        update_files_by_task = db_files.update_files_by_task_id(self.machine_id , self.task_id , status , message)
+        update_files_by_task = self.db_files.update_files_by_task_id(self.machine_id , self.task_id , status , message)
         if update_files_by_task[0]:
             return [ True, "updated all files from task ["+self.task_id+"] to " + status + " - message ["+message+"]"]
         else:
@@ -728,7 +728,7 @@ class Parser_Manager:
     # this function check the files size in parsing status and the avaliable memory space
     # then check if the following file can be parsed on the memory or not
     def wait_memory_free(self, needed_size):
-        files = db_files.get_by_status('parsing')
+        files = self.db_files.get_by_status('parsing')
         if not files[0]:
             return [False, files[1]]
 
@@ -755,7 +755,8 @@ class Parser_Manager:
 @celery_app.task(name=app.config['celery_task_name'] , bind=True)
 def run_parsers(self, main_case_id,machine_case_id,parsers_list):
     
-    parser_manager = Parser_Manager(main_case_id , machine_case_id , parsers_list , self.request.id , self.update_state )
+    mongo_client = create_mongo_client()
+    parser_manager = Parser_Manager(mongo_client, main_case_id, machine_case_id, parsers_list, self.request.id, self.update_state)
     
     try:
 
@@ -782,7 +783,8 @@ def task_error_handler(request, exc , res):
     task_args   =  request.args
     task_id     = request.id 
     logger.logger(level=logger.ERROR , type="parser", message="[Worker] Failed processing task ["+task_id+"] with arg["+task_args[0] +"," + task_args[1] + "," + str(task_args[2])+"] unexpectly" , reason=str(exc))
-    parser_manager = Parser_Manager(task_args[0] , task_args[1] , task_args[2]  ,task_id)
+    mongo_client = create_mongo_client()
+    parser_manager = Parser_Manager(mongo_client, task_args[0], task_args[1], task_args[2], task_id)
     update_files = parser_manager.update_db_files_status('error' , str(exc) )
     if update_files[0]:
         logger.logger(level=logger.INFO , type="parser", message="[Worker] All status of files for task ["+task_id+"] changed to 'error'")

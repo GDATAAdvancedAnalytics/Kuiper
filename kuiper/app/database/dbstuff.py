@@ -28,17 +28,17 @@ DB_PORT = app.config['DB_PORT']
 
 # ===================================== DB groups
 # this class contain the groups
-class DB_Groups():
+class DB_Groups(client):
     MongoClient = None
-    def __init__(self):
+    def __init__(self, client):
 
         # if rules collection not exists, add it to mongoDB
-        db_m = MClient[DB_NAME]
+        db_m = client[DB_NAME]
         
         if 'groups' not in db_m.list_collection_names():
             db_m.create_collection('groups')
 
-        self.MongoClient = MClient[DB_NAME]["groups"]
+        self.MongoClient = client[DB_NAME]["groups"]
 
 
     
@@ -91,8 +91,8 @@ class DB_Groups():
         except Exception as e:
             return [False, str(e)]
 # generate the db rule object
-def get_db_groups():
-    return DB_Groups()
+def get_db_groups(client):
+    return DB_Groups(client)
 
 
 
@@ -114,14 +114,14 @@ def get_db_groups():
 class DB_Cases:
 
     mongo_db = None
-    def __init__(self):
+    def __init__(self, client):
 
         # if cases collection not exists, add it to mongoDB
-        db_m = MClient[DB_NAME]
+        db_m = client[DB_NAME]
         if 'cases' not in db_m.list_collection_names():
             db_m.create_collection('cases')
 
-        self.mongo_db = MClient[DB_NAME]["cases"]
+        self.mongo_db = client[DB_NAME]["cases"]
 
     # ======================= Machines ==========================
 
@@ -323,8 +323,8 @@ class DB_Cases:
             return [False , "Error:" + str(e)]
 
 # generate the db class object
-def get_db_cases():
-    return DB_Cases()
+def get_db_cases(client):
+    return DB_Cases(client)
 
 
 # =================================================
@@ -346,15 +346,15 @@ def get_db_cases():
 # this class contain the rules
 class DB_Rules():
     MongoClient = None
-    def __init__(self):
+    def __init__(self, client):
 
         # if rules collection not exists, add it to mongoDB
-        db_m = MClient[DB_NAME]
+        db_m = client[DB_NAME]
         
         if 'rules' not in db_m.list_collection_names():
             db_m.create_collection('rules')
 
-        self.MongoClient = MClient[DB_NAME]["rules"]
+        self.MongoClient = client[DB_NAME]["rules"]
 
 
     # ===================================== Get rules
@@ -416,8 +416,8 @@ class DB_Rules():
 
 
 # generate the db rule object
-def get_db_rules():
-    return DB_Rules()
+def get_db_rules(client):
+    return DB_Rules(client)
 
 
 
@@ -440,14 +440,14 @@ def get_db_rules():
 class DB_Parsers:
     
     collection = None
-    def __init__(self):
+    def __init__(self, client):
         # if parsers collection not exists, add it to mongoDB
-        db_m = MClient[DB_NAME]
+        db_m = client[DB_NAME]
         
         if 'parsers' not in db_m.list_collection_names():
             db_m.create_collection('parsers')
 
-        self.collection = MClient[DB_NAME]["parsers"]
+        self.collection = client[DB_NAME]["parsers"]
 
 
         # == check the parsers on parsers folder and if parser not on the DB
@@ -617,8 +617,8 @@ class DB_Parsers:
 
 
 # this class contain the parsers
-def get_db_parsers():
-    return DB_Parsers()
+def get_db_parsers(client):
+    return DB_Parsers(client)
 
 # =================================================
 #               End Database Parsers 
@@ -640,14 +640,14 @@ def get_db_parsers():
 class DB_Files:
     
     collection = None
-    def __init__(self):
+    def __init__(self, client):
 
         # if files collection not exists, add it to mongoDB
-        db_m = MClient[DB_NAME]
+        db_m = client[DB_NAME]
         if 'files' not in db_m.list_collection_names():
             db_m.create_collection('files')
 
-        self.collection = MClient[DB_NAME]["files"]
+        self.collection = client[DB_NAME]["files"]
         self.collection.ensure_index("machine_id")
         # Compound index with high-cardinality field first (file_path)
         self.collection.ensure_index([("file_path", 1), ("machine_id", 1)])
@@ -825,24 +825,23 @@ class DB_Files:
 
 
 # this class contain the files
-def get_db_files():
-    return DB_Files()
+def get_db_files(client):
+    return DB_Files(client)
 
 # =================================================
 #               End Database Files 
 # =================================================
 
 
-try:
-    MClient = MongoClient("mongodb://" + DB_IP + ":" + str(DB_PORT) )
-except Exception as e:
-    # NOTE: pymongo v3 does not throw a connection exception here anymore
-    MClient = None
-    logger.logger(level=logger.ERROR , type="database", message="Failed to access to MongoDB " + str(DB_IP) + ":" + str(DB_PORT) , reason=str(e))
-    
+def create_mongo_client():
+    return MongoClient("mongodb://" + DB_IP + ":" + str(DB_PORT))
 
-db_cases    = get_db_cases()    # get case database
-db_rules    = get_db_rules()    # get rule database
-db_files    = get_db_files()    # get files databse
-db_parsers  = get_db_parsers()  # get parser database
-db_groups   = get_db_groups()
+
+MClient = create_mongo_client()
+
+
+db_cases    = get_db_cases(MClient)    # get case database
+db_rules    = get_db_rules(MClient)    # get rule database
+db_files    = get_db_files(MClient)    # get files databse
+db_parsers  = get_db_parsers(MClient)  # get parser database
+db_groups   = get_db_groups(MClient)
