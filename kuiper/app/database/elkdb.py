@@ -492,7 +492,6 @@ class ES_DB:
                 if "Limit of total fields" in doc_reason and limit_fields_increased:
                     fixed_data.append({
                         "_index": doc['index']['_index'],
-                        "_type": doc['index']['_type'],
                         "_id" : doc['index']['_id'],
                         "_source": doc['index']['data']
                     })
@@ -501,7 +500,7 @@ class ES_DB:
                 
 
                 # if there is error where the text field exceeded the maximum number of charactors (by default 32766)
-                match = re.match('Document contains at least one immense term in field="(.+)" \(whose UTF8 encoding is longer than the max length ([0-9]+)\), all of which were skipped.* original message: bytes can be at most ([0-9]+) in length; got ([0-9]+)' , doc_reason)
+                match = re.search('Document contains at least one immense term in field="(.+)" \(whose UTF8 encoding is longer than the max length ([0-9]+)\), all of which were skipped.* original message: bytes can be at most ([0-9]+) in length; got ([0-9]+)' , doc_reason)
                 if match is not None:
                     field = match.groups()[0]
                     current_max = int(match.groups()[1])
@@ -513,7 +512,7 @@ class ES_DB:
 
 
                 # ==== check if reason that an object received but the field data type is not correct
-                match = re.match("object mapping for \[(.*)\] tried to parse field \[(.*)\] as (.*), but found a concrete value" , doc_reason)
+                match = re.search("object mapping for \[(.*)\] tried to parse field \[(.*)\] as (.*), but found a concrete value" , doc_reason)
                 if match is not None:
                     match = match.groups()
                     failed_field = match[0]
@@ -530,7 +529,6 @@ class ES_DB:
                                     
                                     fixed_data.append({
                                         "_index": doc['index']['_index'],
-                                        "_type": doc['index']['_type'],
                                         "_id" : doc['index']['_id'],
                                         "_source": doc['index']['data']
                                     })   
@@ -542,14 +540,13 @@ class ES_DB:
                                     
                                     fixed_data.append({
                                         "_index": doc['index']['_index'],
-                                        "_type": doc['index']['_type'],
                                         "_id" : doc['index']['_id'],
                                         "_source": doc['index']['data']
                                     })   
                                     continue
 
                 # ==== failed to parse field as date 
-                match = re.match("failed to parse field \[(.*)\] of type \[(.*)\] in document with id .*" , doc_reason)
+                match = re.search("failed to parse field \[(.*)\] of type \[(.*)\] in document with id .*" , doc_reason)
                 if match is not None:
                     match = match.groups()
                     failed_field = match[0]
@@ -560,7 +557,6 @@ class ES_DB:
                         if json_update_val_by_path( doc['index']['data'] , failed_field , '1700-01-01T00:00:00' )[0]:
                             fixed_data.append({
                                 "_index": doc['index']['_index'],
-                                "_type": doc['index']['_type'],
                                 "_id" : doc['index']['_id'],
                                 "_source": doc['index']['data']
                             })   
@@ -580,7 +576,6 @@ class ES_DB:
                                     if json_update_val_by_path( doc['index']['data'] , failed_field , res_str )[0]:
                                         fixed_data.append({
                                             "_index": doc['index']['_index'],
-                                            "_type": doc['index']['_type'],
                                             "_id" : doc['index']['_id'],
                                             "_source": doc['index']['data']
                                         })   
@@ -590,7 +585,6 @@ class ES_DB:
                                     if json_update_val_by_path( doc['index']['data'] , failed_field , res_str )[0]:
                                         fixed_data.append({
                                             "_index": doc['index']['_index'],
-                                            "_type": doc['index']['_type'],
                                             "_id" : doc['index']['_id'],
                                             "_source": doc['index']['data']
                                         })   
@@ -602,7 +596,6 @@ class ES_DB:
                 logger.logger(level=logger.ERROR , type="elasticsearch", message=record_msg_info +" : No fix found for failed record ["+doc['index']['_id']+"] data" , reason=doc['index']['data'])
                 nonfixed_data.append({
                         "_index": doc['index']['_index'],
-                        "_type": doc['index']['_type'],
                         "_id" : doc['index']['_id'],
                         "_source": doc['index']['data']
                     })
@@ -610,7 +603,6 @@ class ES_DB:
                 logger.logger(level=logger.ERROR , type="elasticsearch", message=record_msg_info +" : unsuspected error in fixing record issue" , reason=str(e))
                 nonfixed_data.append({
                         "_index": doc['index']['_index'],
-                        "_type": doc['index']['_type'],
                         "_id" : doc['index']['_id'],
                         "_source": doc['index']['data']
                     })
