@@ -5,13 +5,13 @@ WORKDIR /app
 RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf
 
 COPY ./kuiper/requirements_3.txt ./requirements_3.txt
-COPY ./kuiper/requirements_2.7.txt ./requirements_2.7.txt
+COPY ./kuiper/requirements_2.7_celery.txt ./requirements_2.7.txt
 
 RUN apt update -y
 
-RUN apt install -y  python-minimal python3 python-dev libsasl2-dev libldap2-dev libssl-dev python-pip build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev python3-pip sqlite3 cron
-RUN pip2 install --upgrade pip
-RUN pip2 install -r "./requirements_2.7.txt"
+RUN apt install -y pypy pypy-dev pypy-setuptools python3 libsasl2-dev libldap2-dev libssl-dev build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev python3-pip sqlite3 cron
+RUN pypy -m easy_install pip==20.1.1
+RUN pypy -m pip install -r "./requirements_2.7.txt"
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install -r "./requirements_3.txt"
 
@@ -37,4 +37,7 @@ RUN crontab /etc/cron.d/crontab
 RUN touch /var/log/cron_celery.log
 
 
-CMD cron && python -m celery worker -A app.celery_app --loglevel=info -n "kuiper@%h"
+RUN sed -i s/UNABLE_TO_LOAD_APP_MODULE_NOT_FOUND\.format\(e\.name\)/UNABLE_TO_LOAD_APP_MODULE_NOT_FOUND.format\(str\(e\)\)/g /usr/local/lib/pypy2.7/dist-packages/celery/bin/base.py
+
+
+CMD cron && pypy -m celery worker -A app.celery_app --loglevel=info -n "kuiper@%h"
