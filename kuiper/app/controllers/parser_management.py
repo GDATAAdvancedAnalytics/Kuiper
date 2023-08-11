@@ -14,6 +14,7 @@ import time
 import sys 
 import psutil
 import random
+import threading
 
 from flask import Flask
 from flask import request, redirect, render_template, url_for, flash
@@ -259,6 +260,7 @@ class Parser_Manager:
                             
                             if isinstance(json_res , file):
                                 json_res_path = os.path.realpath(json_res.name)
+                                pusher = ThreadedPusher()
                                 while True:
                                     res = getattr(parser_module , parser_func + "_pull")( json_res , self.es_chunks_size )
                                     
@@ -270,17 +272,18 @@ class Parser_Manager:
                                     
                                     # if there is a results to push
                                     if len(res):
-                                        pushing_results =  self.fix_and_push_parsed_data(res , parser_name , f , start_time)
-                                        pushed          =  pushing_results[0]
-                                        pushed_records  += pushing_results[1]
-                                        failed_records  += pushing_results[2]
-                                        message         =  pushing_results[3]
-                                        if pushed == False:
-                                            break
+                                        pusher.push_data(self, res, parser_name, f, start_time)
                                     else:
                                         # if there is no more results to push
                                         break
 
+                                # wait for all threads to complete and get the cumulated stats
+                                pusher.wait()
+                                pushed_records += pusher.pushed_records
+                                failed_records += pusher.failed_records
+
+                                for err in pusher.errors:
+                                    logger.logger(level=logger.ERROR, type="parser", message="Parser["+parser_name+"]: Encountered error while pushing data", reason=err)
 
                                 # get the real path of the temp file and delete it
                                 json_res.close()
@@ -748,6 +751,49 @@ class Parser_Manager:
             return True
     
 
+class ThreadedPusher:
+    NUM_THREADS = 4
+
+    def __init__(self, num_threads=NUM_THREADS):
+        self.pushed_records = 0
+        self.failed_records = 0
+        self.lock = threading.Lock()
+        self.semaphore = threading.Semaphore(num_threads)
+        self.threads = []
+        self.errors = []
+
+    def push_data(self, manager, records, parser_name, filename, start_time):
+        self.semaphore.acquire()
+        try:
+            t = threading.Thread(target=self.thread_proc, args=(manager, records, parser_name, filename, start_time))
+            t.start()
+            with self.lock:
+                self.threads.append(t)
+        except Exception:
+            self.semaphore.release()
+
+    def thread_proc(self, manager, records, parser_name, filename, start_time):
+        try:
+            results = manager.fix_and_push_parsed_data(records, parser_name, filename, start_time)
+            with self.lock:
+                self.pushed_records += results[1]
+                self.failed_records += results[2]
+                if not results[0]:
+                    self.errors.append(results[3])
+        finally:
+            with self.lock:
+                self.threads.remove(threading.current_thread())
+            self.semaphore.release()
+
+    def wait(self):
+        while True:
+            with self.lock:
+                if len(self.threads) == 0:
+                    return
+                t = self.threads[0]
+            t.join(30)
+            if t.isAlive():
+                raise Exception("Timeout elapsed while waiting for pusher threads to finish (num remaining: " + str(len(self.threads)) + ")")
 
 
 # =================================================
