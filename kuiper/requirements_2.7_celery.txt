@@ -1,7 +1,7 @@
 libscca_python==20181227
 Flask==0.10.1
 unicodecsv==0.14.1
-elasticsearch==7.6.0
+elasticsearch==7.17.9
 xmltodict==0.12.0
 six==1.10.0
 requests==2.21.0

@@ -620,7 +620,7 @@ class ES_DB:
         try:
             indx = indx.lower()
 
-            up = self.es_db.update(index = indx , doc_type="_doc", id=doc_id , body = data )
+            up = self.es_db.update(index=indx, id=doc_id, body=data)
             if up['result'] == 'updated':
                 return [True , 'updated']
             else :
