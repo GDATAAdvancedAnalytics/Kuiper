@@ -91,7 +91,9 @@ class ES_DB:
         transport_args = {}
         if ca_file is not None:
             transport_args = {'ssl_context': create_ssl_context(cafile=ca_file)}
-        self.es_db = Elasticsearch(es_url.split(','), api_key=api_key, timeout=120, **transport_args)
+        self.es_db = Elasticsearch(es_url.split(','), api_key=api_key, timeout=1200,
+                    http_compress=True,
+                    **transport_args)
         #print inspect.getargspec(self.es_db.indices.put_settings())
         # setting 
 
