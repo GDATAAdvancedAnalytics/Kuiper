@@ -753,6 +753,7 @@ class Parser_Manager:
 
 class ThreadedPusher:
     NUM_THREADS = 4
+    WAIT_TIMEOUT = 120
 
     def __init__(self, num_threads=NUM_THREADS):
         self.pushed_records = 0
@@ -791,7 +792,7 @@ class ThreadedPusher:
                 if len(self.threads) == 0:
                     return
                 t = self.threads[0]
-            t.join(30)
+            t.join(self.WAIT_TIMEOUT)
             if t.isAlive():
                 raise Exception("Timeout elapsed while waiting for pusher threads to finish (num remaining: " + str(len(self.threads)) + ")")
 
