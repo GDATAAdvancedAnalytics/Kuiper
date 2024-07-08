@@ -16,5 +16,6 @@ RUN chmod 0644 /etc/cron.d/crontab
 RUN crontab /etc/cron.d/crontab
 RUN touch /var/log/cron_mongodb.log
 
+EXPOSE 27017
 
 CMD cron && docker-entrypoint.sh mongod

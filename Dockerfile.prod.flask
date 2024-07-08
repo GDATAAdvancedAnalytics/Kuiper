@@ -2,7 +2,7 @@ FROM python:2.7
 
 RUN mkdir -p /app/
 WORKDIR /app
-RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf
+#RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf
 
 COPY ./kuiper/requirements_3.txt ./requirements_3.txt
 COPY ./kuiper/requirements_2.7.txt ./requirements_2.7.txt
@@ -21,10 +21,10 @@ WORKDIR /tmp/
 RUN apt-get install -y build-essential git gettext flex bison libtool autoconf automake pkg-config libpcap-dev libjson-c-dev libnuma-dev libpcre2-dev libmaxminddb-dev librrd-dev
 RUN git clone https://github.com/ntop/nDPI.git
 WORKDIR /tmp/nDPI
-RUN chmod +x ./autogen.sh 
-RUN ./autogen.sh 
-RUN ./configure 
-RUN make 
+RUN chmod +x ./autogen.sh
+RUN ./autogen.sh
+RUN ./configure
+RUN make
 RUN make install
 WORKDIR /app
 

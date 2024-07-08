@@ -1,0 +1,143 @@
+# run kuiper with 'docker-compose up --build'
+
+version: "3.4"
+
+volumes:
+  kuiper_app_files:
+    driver_opts:
+      type: "local"
+      device: "${HOME}/Projects/Kuiper/kuiper"
+      o: "bind"
+
+
+networks:
+  kuiper:
+    internal: true
+
+
+services:
+
+  # =========================== Flask
+  flask:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod.flask
+    container_name: kuiper-flask
+    restart: always
+    networks:
+      - default
+      - kuiper
+    volumes:
+      - "kuiper_app_files:/app/:rw"
+      - "${HOME}/volumes/kuiper-file-storage:/app/files/:rw"
+
+    depends_on:
+      - "mongodb"
+      - "es01"
+      - "redis"
+
+    ports:
+      - "80:5000"
+
+    environment:
+      - FLASK_IP=0.0.0.0 # only in this container: bind ip for gunicorn
+      - GUNICORN_THREADS=4
+      - GUNICORN_WORKERS=2
+
+    env_file:
+      - ".env"
+
+
+  mongodb:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod.mongodb
+    container_name: kuiper-mongodb
+    restart: always
+    networks:
+      - default
+      - kuiper
+
+    env_file:
+      - ".env"
+
+    volumes:
+      - /opt/kuiper-mongodb/:/data/db:rw
+    ports:
+      - 27017:27017
+    environment:
+      - MONGODB_IP=127.0.0.1 # only in this container: for health check
+
+
+  es01:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod.es01
+    container_name: kuiper-es
+    restart: always
+    networks:
+      - default
+      - kuiper
+
+    environment:
+      - node.name=es01
+      - cluster.name=es-docker-cluster
+      - discovery.seed_hosts=es01
+      - cluster.initial_master_nodes=es01
+      - network.host=0.0.0.0
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms2G -Xmx2G"
+
+    env_file:
+      - ".env"
+    ports:
+      - "9200:9200"
+    expose:
+      - "9200"
+
+    volumes:
+      - ${HOME}/volumes/kuiper-elasticsearch:/usr/share/elasticsearch/data:rw
+
+
+
+
+    # =========================== Celery
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod.celery
+    container_name: kuiper-celery
+    restart: always
+    networks:
+      - kuiper
+
+    depends_on:
+      - "redis"
+      - "mongodb"
+      - "es01"
+      - "flask"
+
+    volumes:
+      - "kuiper_app_files:/app/"
+      - "${HOME}/volumes/kuiper-file-storage:/app/files/:rw"
+
+    env_file:
+      - ".env"
+
+
+
+  # =========================== Redis
+  redis:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod.redis
+    container_name: kuiper-redis
+    restart: always
+    networks:
+      - kuiper
+    volumes:
+      - "/opt/kuiper-redis:/data:rw"
+
+    env_file:
+      - ".env"
+
