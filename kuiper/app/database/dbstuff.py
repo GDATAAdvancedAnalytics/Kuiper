@@ -437,9 +437,11 @@ class DB_Parsers:
 
         self.collection = client[DB_NAME]["parsers"]
 
+    def read_parsers(self):
         # == check the parsers on parsers folder and if parser not on the DB
         # == read the configuration from the parser folder and push it to the DB
         # get all parsers on the parsers folder
+
         filenames = os.listdir(app.config['PARSER_PATH'])
         parsers = []
         for files in filenames:
@@ -480,7 +482,10 @@ class DB_Parsers:
                 logger.logger(level=logger.ERROR , type="mongo_parsers",
                               message="Failed loading parsers configurations", reason=str(e))
 
+
+
     # ===================================== add parser
+
     def add_parser(self, parser_details):
         try:
             parser_details['_id'] = parser_details['name']
@@ -594,6 +599,7 @@ class DB_Parsers:
         except Exception as e:
             return [False , "Error: " + str(e)]
 
+
     # ===================================== Delete parser for replacement config
     # this is used to delete a parser from the database
     # so it can later be re-added with a new config (used for updating parser config)
@@ -623,11 +629,6 @@ def get_db_parsers(client):
 # =================================================
 #               End Database Parsers
 # =================================================
-
-
-
-
-
 
 
 
@@ -750,6 +751,7 @@ class DB_Files:
         except Exception as e:
             return [False , "Error: " + str(e)]
 
+
     # ===================================== Get file details
     # get parsers details for all parsers by the file path
     def get_by_file_path(self, machine_id , file_path):
@@ -760,6 +762,7 @@ class DB_Files:
             return [True, None]
         except Exception as e:
             return [False, str(e)]
+
 
     # ===================================== Get parsing progress
     # get the status of parsers for specific machine
@@ -775,6 +778,7 @@ class DB_Files:
             return [True, parsers_progress]
         except Exception as e:
             return [False,  str(e)]
+
 
     # ==================================== Get files based on status
     # get files globally based on their status

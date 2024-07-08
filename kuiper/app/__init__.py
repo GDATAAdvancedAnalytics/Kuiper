@@ -1,4 +1,4 @@
-import os 
+import os
 import yaml
 
 import inspect
@@ -6,20 +6,20 @@ from datetime import datetime, timedelta
 
 from flask import Flask, g , session, render_template, Blueprint, send_from_directory, send_file
 from flask import request, redirect, url_for
- 
+
 import urllib, json
 from celery import Celery
 from celery.bin import worker
 from jinja2 import TemplateNotFound
- 
+
 #from flask.ext.celery import Celery
 
 # ldap authentication
 from utils.flask_simpleldap import LDAP, LDAPException
 from utils.build_timeline import buildTimeline
- 
+
 app = Flask(__name__)
-  
+
 y = yaml.load( open( 'configuration.yaml' , 'r' ) , Loader=yaml.FullLoader )
 
 
@@ -44,7 +44,7 @@ app.config['CELERY_BROKER_URL'] 	    = celery_broker_url
 app.config['CELERY_RESULT_BACKEND']     = celery_result_backend
 app.config['CELERY_TASK_ACKS_LATE']     = os.getenv('CELERY_TASK_ACKS_LATE', y['CELERY']['CELERY_TASK_ACKS_LATE']).lower() in ("yes", "y", "true",  "t", "1")
 app.config['CELERY_IGNORE_RESULT']      = False
-app.config['celery_task_name']          = os.getenv('celery_task_name', y['CELERY']['celery_task_name']) 
+app.config['celery_task_name']          = os.getenv('celery_task_name', y['CELERY']['celery_task_name'])
 
 celery_app = Celery(app , backend =app.config['CELERY_RESULT_BACKEND'] , broker  =app.config['CELERY_BROKER_URL'])
 
@@ -52,19 +52,19 @@ celery_app.conf.worker_max_tasks_per_child=1 # terminate celery worker when done
 
 
 # ======================== Mongodb configuration
-app.config['DB_NAME']                   = os.getenv('MONGODB_DB_NAME', y['MongoDB']['DB_NAME']) 
-app.config['DB_IP']                   	= os.getenv('MONGODB_IP', y['MongoDB']['DB_IP'])  
-app.config['DB_PORT']                   = os.getenv('MONGODB_PORT', y['MongoDB']['DB_PORT'])  
+app.config['DB_NAME']                   = os.getenv('MONGODB_DB_NAME', y['MongoDB']['DB_NAME'])
+app.config['DB_IP']                   	= os.getenv('MONGODB_IP', y['MongoDB']['DB_IP'])
+app.config['DB_PORT']                   = os.getenv('MONGODB_PORT', y['MongoDB']['DB_PORT'])
 
 
 app.config['SIDEBAR_OPEN']              = y['adminlte']['SIDEBAR_OPEN']
 
-  
-# ====================== LDAP configuration 
+
+# ====================== LDAP configuration
 app.config['LDAP_ENABLED']              = os.getenv('LDAP_ENABLED', y['LDAP_auth']['enabled']).lower() in ("yes", "y", "true",  "t", "1")
-app.config['LDAP_HOST']                 = os.getenv('LDAP_HOST', y['LDAP_auth']['LDAP_HOST']) 
-app.config['LDAP_PORT']                 = os.getenv('LDAP_PORT', y['LDAP_auth']['LDAP_PORT']) 
-app.config['LDAP_SCHEMA']               = os.getenv('LDAP_SCHEMA', y['LDAP_auth']['LDAP_SCHEMA']) 
+app.config['LDAP_HOST']                 = os.getenv('LDAP_HOST', y['LDAP_auth']['LDAP_HOST'])
+app.config['LDAP_PORT']                 = os.getenv('LDAP_PORT', y['LDAP_auth']['LDAP_PORT'])
+app.config['LDAP_SCHEMA']               = os.getenv('LDAP_SCHEMA', y['LDAP_auth']['LDAP_SCHEMA'])
 app.config['LDAP_USE_SSL']              = os.getenv('LDAP_USE_SSL', y['LDAP_auth']['LDAP_USE_SSL']).lower() in ("yes", "y", "true",  "t", "1")
 app.config['LDAP_BASE_DN']              = os.getenv('LDAP_BASE_DN', y['LDAP_auth']['LDAP_BASE_DN'])
 app.config['LDAP_USERNAME']             = os.getenv('LDAP_USERNAME', y['LDAP_auth']['LDAP_USERNAME'])
@@ -73,15 +73,15 @@ app.config['LDAP_USER_OBJECT_FILTER']   = os.getenv('LDAP_USER_OBJECT_FILTER', y
 app.config['LDAP_SESSION_EXPIRATION']   = int(os.getenv('LDAP_SESSION_EXPIRATION', y['LDAP_auth']['session_expiration']))
 
 if app.config['LDAP_ENABLED']:
-    ldap = LDAP(app) 
+    ldap = LDAP(app)
 
 # ======================= Flask configuration
 # check whether rhaegal enabled or not
 app.config["ENABLE_RHAEGAL"]            = os.getenv('FLASK_ENABLE_RHAEGAL', y['Kuiper']['enable_Rhaegal']).lower() in ("yes", "y", "true",  "t", "1")
-app.config['FLASK_LOGS_LEVEL']          = os.getenv('FLASK_LOGS_LEVEL', y['Kuiper']['logs_level']) 
-app.config['FLASK_API_TOKEN']           = os.getenv('FLASK_API_TOKEN', y['Kuiper']['api_token']) 
-app.config['GIT_URL_RELEASE']           = os.getenv('GIT_URL_RELEASE', y['Git']['git_url_release']) 
-app.config['GIT_KUIPER_VERSION']        = os.getenv('GIT_KUIPER_VERSION', y['Git']['k_version']) 
+app.config['FLASK_LOGS_LEVEL']          = os.getenv('FLASK_LOGS_LEVEL', y['Kuiper']['logs_level'])
+app.config['FLASK_API_TOKEN']           = os.getenv('FLASK_API_TOKEN', y['Kuiper']['api_token'])
+app.config['GIT_URL_RELEASE']           = os.getenv('GIT_URL_RELEASE', y['Git']['git_url_release'])
+app.config['GIT_KUIPER_VERSION']        = os.getenv('GIT_KUIPER_VERSION', y['Git']['k_version'])
 app.config['FLASK_REMOVE_RAW_FILES']    = os.getenv('FLASK_REMOVE_RAW_FILES', y['Kuiper']['RemoveRawFiles']).lower() in ("yes", "y", "true",  "t", "1")
 app.config['FLASK_CASE_SIDEBAR']        = y['case_sidebar']
 
@@ -94,38 +94,38 @@ app.config['TIMELINE_VIEWS_FOLDER']     = os.path.abspath( ''.join(y['Directorie
 app.config['DOCS_FOLDER'] 	            = os.path.abspath( ''.join(y['Directories']['docs_folder']) )	# doc folder
 
 
-  
- 
-app.secret_key = os.getenv('FLASK_SECRET_KEY', y['Kuiper']['secret_key']) 
+
+
+app.secret_key = os.getenv('FLASK_SECRET_KEY', y['Kuiper']['secret_key'])
 # ============== logs files
 logs_folder                               = y['Logs']['log_folder']
 
 
 # create of folders
 built_in_dirs = [
-    app.config['UPLOADED_FILES_DEST'] , 
-    app.config['UPLOADED_FILES_DEST_RAW'] , 
+    app.config['UPLOADED_FILES_DEST'] ,
+    app.config['UPLOADED_FILES_DEST_RAW'] ,
     app.config['TIMELINE_FOLDER'],
     logs_folder,
     app.config['SYSTEM_HEALTH_PATH'],
     os.path.join(app.config['PARSER_PATH'] , "temp")
-    
+
     ]
 for d in built_in_dirs:
     try:
         os.mkdir(d)
     except:
         pass
- 
 
-# ===================== Logger - START ===================== # 
+
+# ===================== Logger - START ===================== #
 # class Logger to handle all Kuiper logs
 class Logger:
     ERROR     = 0
     WARNING   = 1
     INFO      = 2
     DEBUG     = 3
-    
+
 
     def __init__(self , log_file , level=None):
         self.log_file   = log_file
@@ -137,7 +137,7 @@ class Logger:
             3 : 'DEBUG'
         }
 
-        
+
 
         self.logfile_handle = open(log_file , 'a+')
 
@@ -165,27 +165,30 @@ elif app.config['FLASK_LOGS_LEVEL'] == 'WARNING':
     log_level = Logger.WARNING
 else:
     log_level = Logger.ERROR
-    
- 
+
+
 logger = Logger(os.path.join(logs_folder , y['Logs']['kuiper_log']) , log_level )
 
-# ===================== Logger - END ===================== # 
+# ===================== Logger - END ===================== #
 
 
 
 
 
-from controllers import case_management,admin_management,API_management
-   
-# redirector to the actual home page 
+from controllers import case_management, admin_management, API_management
+from database.dbstuff import db_parsers
+
+db_parsers.read_parsers()
+
+# redirector to the actual home page
 @app.route('/')
 def home():
     return redirect(url_for('home_page'))
- 
 
 
 
-# ================= ldap authentication 
+
+# ================= ldap authentication
 
 def is_authenticated():
     return 'last_visit' in session and 'user_id' in session
@@ -221,7 +224,7 @@ def before_request():
         else:
             logger.logger(level=logger.ERROR , type="API", message="Unauthorized" , reason="No API token")
             return "No API token", 401
-    
+
     if app.config['LDAP_ENABLED']  == False:
         return
 
@@ -229,15 +232,15 @@ def before_request():
         session_expired = datetime.now() > session['last_visit'] + timedelta(minutes = app.config['LDAP_SESSION_EXPIRATION'])
         if 'last_visit' not in session or session_expired:
             return redirect(url_for('login', message="Session expired!", url=request.full_path))
-        
+
         if not ( request.full_path.startswith('/case/') and request.full_path.endswith('progress') ):
             session['last_visit'] = datetime.now()
 
-        return 
-    
+        return
+
 
     return redirect(url_for('login', message=None))
-    
+
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -258,7 +261,7 @@ def login():
             return render_template('login.html' , msg=message )
 
         if test is None or passwd == '':
-            
+
             logger.logger(level=logger.ERROR , type="login", message="Failed to login" , reason="invalid credentials")
             return render_template('login.html' , msg='Invalid credentials')
         else:
@@ -279,19 +282,19 @@ def logout():
 
     if app.config['LDAP_ENABLED'] == False:
         return redirect(url_for('home'))
-        
-        
+
+
     try:
         del session['user_id']
         del session['last_visit']
-    except: 
+    except:
         pass
-    
+
     message = request.args.get('message' , None)
     url     = request.args.get('url' , None)
     if message is not None and url is not None:
-        return redirect(url_for('login', message=message, url=request.full_path)) 
-    return redirect(url_for('login')) 
+        return redirect(url_for('login', message=message, url=request.full_path))
+    return redirect(url_for('login'))
 
 
 
@@ -310,4 +313,4 @@ def documentation(filename):
         app.config['DOCS_FOLDER'],
         filename
     )
-  
+
