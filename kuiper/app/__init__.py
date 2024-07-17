@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 from flask import Flask, g , session, render_template, Blueprint, send_from_directory, send_file
 from flask import request, redirect, url_for
 
-import urllib, json
+import urllib, json, redis
+from redis.lock import Lock
 from celery import Celery
 from celery.bin import worker
 from jinja2 import TemplateNotFound
@@ -178,7 +179,16 @@ logger = Logger(os.path.join(logs_folder , y['Logs']['kuiper_log']) , log_level 
 from controllers import case_management, admin_management, API_management
 from database.dbstuff import db_parsers
 
-db_parsers.read_parsers()
+r = redis.Redis(host=redis_ip, port=redis_port, db=0)
+
+lock = Lock(r, "parser_load_key", timeout=30)
+
+if lock.acquire(blocking=False):
+    try:
+        db_parsers.read_parsers()
+    finally:
+        lock.release()
+
 
 # redirector to the actual home page
 @app.route('/')
